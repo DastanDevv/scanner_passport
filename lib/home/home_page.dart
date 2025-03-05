@@ -1,9 +1,11 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
 import 'package:pass_scanner/home/camera_screen.dart';
+import 'package:pass_scanner/home/passport_upload_dialog.dart';
 
 class PassportScannerScreen extends StatefulWidget {
   const PassportScannerScreen({super.key});
@@ -55,7 +57,6 @@ class PassportScannerScreenState extends State<PassportScannerScreen> {
     );
   }
 
-  /// Распознаём текст с изображения
   Future<void> scanText(File imageFile, bool isFaceSide) async {
     final inputImage = InputImage.fromFile(imageFile);
     final textDetector = GoogleMlKit.vision.textRecognizer();
@@ -115,81 +116,68 @@ class PassportScannerScreenState extends State<PassportScannerScreen> {
     }
   }
 
+  void _resetState() {
+    setState(() {
+      faceImage = backImage = null;
+      faceSideText = backSideText = '';
+      showResult = faceScanned = false;
+    });
+  }
+
+  Widget _buildScanButton(String text, VoidCallback onPressed) {
+    return Expanded(
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: text.contains("камерой") ? Colors.blue : null,
+          foregroundColor: text.contains("камерой") ? Colors.white : null,
+        ),
+        child: Text(text),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Сканер паспорта Кыргызстана")),
+      appBar: AppBar(title: const Text("Сканер паспорта Кыргызстана")),
       body: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             Row(
               children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        if (showResult) {
-                          faceImage = null;
-                          backImage = null;
-                          faceSideText = "";
-                          backSideText = "";
-                          showResult = false;
-                          faceScanned = false;
-                        }
-                      });
-                      showPassportDialog();
-                    },
-                    child: Text("📸 Загрузить паспорт"),
-                  ),
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        faceImage = null;
-                        backImage = null;
-                        faceSideText = "";
-                        backSideText = "";
-                        showResult = false;
-                        faceScanned = false;
-                      });
-                      openCameraScanner();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text("📷 Сканировать камерой"),
-                  ),
-                ),
+                _buildScanButton("📸 Загрузить паспорт", showPassportDialog),
+                const SizedBox(width: 10),
+                _buildScanButton("📷 Сканировать камерой", () {
+                  _resetState();
+                  openCameraScanner();
+                }),
               ],
             ),
+            if (showResult) _buildResultSection(),
+          ],
+        ),
+      ),
+    );
+  }
 
-            if (showResult)
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: 20),
-                      Text(
-                        "Данные паспорта:",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Text(
-                        "$faceSideText\n$backSideText",
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+  Widget _buildResultSection() {
+    return Expanded(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 20),
+            const Text(
+              "Данные паспорта:",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "$faceSideText\n$backSideText",
+              style: const TextStyle(fontSize: 16),
+            ),
           ],
         ),
       ),
@@ -199,137 +187,24 @@ class PassportScannerScreenState extends State<PassportScannerScreen> {
   void showPassportDialog() {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              backgroundColor: Color(0xFFFFFFFF),
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Лицевая часть паспорта
-                    GestureDetector(
-                      onTap: () async {
-                        if (faceImage == null) {
-                          await pickImage(
-                            ImageSource.gallery,
-                            isFaceSide: true,
-                            dialogSetState: setState,
-                          );
-                        }
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        height: 214,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFF7F7F7),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child:
-                            faceImage != null
-                                ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    faceImage!,
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                                : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.file_upload_outlined,
-                                      size: 50,
-                                      color: Colors.grey[400],
-                                    ),
-                                    SizedBox(height: 10),
-                                    Text(
-                                      "Лицевая часть паспорта",
-                                      style: TextStyle(fontSize: 16),
-                                    ),
-                                  ],
-                                ),
-                      ),
-                    ),
-                    SizedBox(height: 14),
-                    GestureDetector(
-                      onTap: () async {
-                        if (backImage == null) {
-                          await pickImage(
-                            ImageSource.gallery,
-                            isFaceSide: false,
-                            dialogSetState: setState,
-                          );
-                        }
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        height: 214,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFF7F7F7),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child:
-                            backImage != null
-                                ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    backImage!,
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                                : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.file_upload_outlined,
-                                      size: 50,
-                                      color: Colors.grey[400],
-                                    ),
-                                    SizedBox(height: 10),
-                                    Text(
-                                      "Оборотная часть паспорта",
-                                      style: TextStyle(fontSize: 16),
-                                    ),
-                                  ],
-                                ),
-                      ),
-                    ),
-                    if (faceImage != null && backImage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green[600],
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            "Отлично! Минуту, мы обрабатываем данные...",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      builder:
+          (context) => PassportUploadDialog(
+            initialFaceImage: faceImage,
+            initialBackImage: backImage,
+            onImagePicked: (image, isFaceSide) {
+              setState(() {
+                if (isFaceSide) {
+                  faceImage = image;
+                } else {
+                  backImage = image;
+                }
+              });
+              if (image != null) scanText(image, isFaceSide);
+            },
+            onProcessingComplete: () {
+              setState(() => showResult = true);
+            },
+          ),
     );
   }
 
